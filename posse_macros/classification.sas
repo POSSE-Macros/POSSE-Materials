@@ -4,7 +4,7 @@
  /*-------------------------------------------------------------------*
   *                                                                   *
   *  Bill Miller  <wem0@cdc.gov>                                      *
-  *  October 2012 / Last edited in March 2018                         *
+  *  October 2012 / Last edited in July 2019                          *
   *                                                                   *
   *  DISCLAIMER:  The five POSSE macros are provided to SAS users     *
   *  who wish to perform global exploratory analyses near the         *
@@ -43,9 +43,12 @@
   *  all cluster analyses.  To determine the number of clusters, the  *
   *  'fitclust=' entry can be set to 'YES' to fit a series of         *
   *  two to seven clusters.  This will then display and the plot the  *
-  *  CCC statistics.  A positive CCC statistic > 2 indicates well-    *
-  *  defined clusters, but CCC statistics between 0 and 2 should be   *
-  *  interpreted cautiously.  Once the number of clusters is chosen,  *
+  *  CCC and Pseudo-F statistics (Pseudo-F was added July 2019).      *
+  *  A positive CCC statistic > 2 indicates well-defined clusters,    *
+  *  but CCC statistics between 0 and 2 should be interpreted caut-   *
+  *  iously.  If the maximum values of the CCC and Pseudo-F statist-  *
+  *  ics suggest different numbers of clusters, the number suggested  *
+  *  by the Pseudo-F is recommended.  Once this number is chosen,     *
   *  the 'nclust=' entry will produce additional information and      *
   *  graphs for that choice, and the 'out=' entry will save the       *
   *  cluster variable along with the variables used in the clustering.*
@@ -669,11 +672,20 @@ run;
 proc fastclus data=_scores_ maxclusters=&msize ;
 var dim1 dim2 dim3;
 id &id ;
-ods output CCC=_cccstat_ ;
+ods output CCC=_cccstat_ PseudoFStat=_pseudf_;
+run;
+
+data _pseudf_;
+  set _pseudf_;
+pseudo = value;
+keep pseudo;
+
+data _clustnumstats_;
+  merge _cccstat_ _pseudf_ ;
 run;
 
 data _onestat_;
-  set _cccstat_;
+  set _clustnumstats_;
 nclust = input(symget('msize'),1.0);
 
 proc append data=_onestat_ base=_tempstats_;
@@ -689,7 +701,7 @@ run;
 
 data _modstats_;
   set _tempstats_;
-label nclust='Number of Clusters' value='CCC Criterion';
+label nclust='Number of Clusters' value='CCC Criterion' pseudo='Pseudo-F';
 run;
 
 proc datasets nolist;
@@ -697,11 +709,18 @@ delete _tempstats_;
 
 proc print data=_modstats_ split='*';
 id nclust;
-var value;
+var value pseudo;
 run;
 
 proc sgplot data=_modstats_;
 series x=nclust y=value / datalabel=value;
+xaxis grid;
+yaxis grid;
+title;
+run;
+
+proc sgplot data=_modstats_;
+series x=nclust y=pseudo / datalabel=pseudo;
 xaxis grid;
 yaxis grid;
 title;
@@ -1016,5 +1035,4 @@ run;
 title; run;
 
 %mend classification;
-
 
